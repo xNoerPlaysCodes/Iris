@@ -141,6 +141,11 @@ namespace iris {
 
     void hook_log(log_hook hook) noexcept {
         internal::g_state.log_hook = hook;
+        iris::error(error_code::unimplemented);
+    }
+
+    void hook_error(error_hook hook) noexcept {
+        internal::g_state.error_hook = hook;
     }
 
     void crash(const std::string &message) noexcept {

@@ -13,11 +13,11 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY})
 set(CMAKE_BUILD_TYPE Debug)
 
-function (SetBinaryOutputDirectory output)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output} PARENT_SCOPE)
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output} PARENT_SCOPE)
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output} PARENT_SCOPE)
-endfunction()
+macro (SetBinaryOutputDirectory output)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output})
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output})
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${BINARY_OUTPUT_DIRECTORY}/${output})
+endmacro()
 
 project(Iris CXX C)
 
@@ -111,12 +111,14 @@ add_library(${PROJECT_NAME}
     src/internal/crash_handler.cpp
     src/internal/error.cpp
     src/internal/utilities.cpp
+    src/core/asset_manager.cpp
     ${IRIS_RENDERER_SOURCES}
     ${NATIVE_EXTRA_SOURCES}
     src/graphics/windowing/${IRIS_WINDOW_SOURCE}
     src/internal/native/${NATIVE_SOURCE}
 
     src/lib/stb_truetype.c
+    src/lib/stb_image.c
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -146,6 +148,7 @@ target_link_libraries(${PROJECT_NAME}
 set(TEST_NAMES
     core/runtime.cpp
     core/window.cpp
+    core/rendering.cpp
 )
 
 foreach(test_name IN LISTS TEST_NAMES)

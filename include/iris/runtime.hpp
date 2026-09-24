@@ -53,6 +53,8 @@ namespace iris {
     X(file_not_found) \
     X(filesystem_error) \
     X(malformed_input) \
+    X(duplicate) \
+    X(unimplemented)
 
 #define X(name) name,
 
@@ -98,6 +100,9 @@ namespace iris {
 
     /// @brief Hook the logger
     void hook_log(log_hook hook) noexcept;
+
+    /// @brief Hook erroring
+    void hook_error(error_hook hook) noexcept;
 
     /// @brief Crash fatally
     [[noreturn]] void crash(const std::string &message = "Fatal Crash") noexcept;

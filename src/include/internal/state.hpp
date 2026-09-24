@@ -19,6 +19,7 @@ namespace iris::internal {
             u32 gl_version = 0;
         } gl_state;
         log_hook log_hook = nullptr;
+        error_hook error_hook = nullptr;
     };
 
     extern global_state g_state;

@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include "glm/fwd.hpp"
+#include "iris/core/asset_manager.hpp"
 #include "iris/types.hpp"
 #include "iris/graphics/windowing.hpp"
 
@@ -25,6 +26,9 @@ namespace iris {
 
             ~config() noexcept {}
         };
+
+        static constexpr u32 filter_nearest_neighbour = 0x1;
+        static constexpr u32 filter_linear = 0x2;
     private:
         struct drawcall;
 
@@ -60,8 +64,17 @@ namespace iris {
         /// @brief Draw a rectangle
         void draw_rectangle(glm::vec2 pos, glm::vec2 size, rgba_color color) noexcept;
 
+        /// @brief Draw a texture
+        void draw_texture(glm::vec2 pos, glm::vec2 size, const texture &tx) noexcept;
+
         /// @brief Draw the FPS counter
         void draw_fps(glm::vec2 pos = { 10, 10 }) noexcept;
+
+        /// @brief Load a texture
+        texture load_texture(const image &image, u32 filter = filter_linear) const noexcept;
+
+        /// @brief Unload a texture
+        void unload_texture(texture &texture) const noexcept;
 
         void debug() noexcept;
 

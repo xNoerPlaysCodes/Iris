@@ -1,4 +1,7 @@
+#include "error.hpp"
 #include "glm/fwd.hpp"
+#include "iris/core/asset_manager.hpp"
+#include "iris/runtime.hpp"
 #include "iris/types.hpp"
 #include <fstream>
 #include <iris/graphics/rendering.hpp>
@@ -6,7 +9,9 @@
 #include "spdlog/spdlog.h"
 #include <assert.hpp>
 #include <string>
+#include <type_traits>
 #include "lib/stb_truetype.h"
+#include "state.hpp"
 
 namespace iris {
     namespace {
@@ -20,6 +25,7 @@ namespace iris {
         rgba_color color;
         glm::vec2 pos;
         glm::vec2 size;
+        std::unordered_map<std::string, gl::uniform_value> uniforms;
     };
 
     renderer::renderer(const class window &window, struct config cfg) noexcept
@@ -97,6 +103,14 @@ namespace iris {
                 dc.object.shader.update_uniforms();
             }
 
+            for (auto &[k, v] : dc.uniforms) {
+                dc.object.shader.uniforms.try_emplace(k, std::remove_cvref_t<decltype(v)>{});
+                if (auto &val = dc.object.shader.uniforms.at(k); val != v) {
+                    val = v;
+                    dc.object.shader.update_uniforms();
+                }
+            }
+
             glBindVertexArray(dc.object.vao);
             glDrawElements(GL_TRIANGLES, dc.object.indices, GL_UNSIGNED_INT, nullptr);
         }
@@ -133,6 +147,43 @@ namespace iris {
     }
 #endif
 
+    texture renderer::load_texture(const image &image, u32 filter) const noexcept {
+        texture tx = texture::invalid;
+        glGenTextures(1, &tx());
+        glBindTexture(GL_TEXTURE_2D, tx());
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data.data());
+        
+        if (filter & filter_linear) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        } else if (filter & filter_nearest_neighbour) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        } else {
+            iris::error(error_code::malformed_input, "Filter bitmask is invalid");
+            glBindTexture(GL_TEXTURE_2D, internal::g_state.gl_state.bound_texture);
+            glDeleteTextures(1, &tx());
+            return texture::invalid;
+        }
+
+        glBindTexture(GL_TEXTURE_2D, internal::g_state.gl_state.bound_texture);
+        return tx;
+    }
+
+    void renderer::unload_texture(texture &tx) const noexcept {
+        if (tx == texture::invalid) {
+            iris::error(error_code::malformed_input, "Texture is invalid");
+            return;
+        }
+
+        if (internal::g_state.gl_state.bound_texture == tx()) {
+            glBindTexture(GL_TEXTURE_2D, 0);
+            internal::g_state.gl_state.bound_texture = 0;
+        }
+
+        glDeleteTextures(1, &tx());
+    }
+
     void renderer::draw_rectangle(glm::vec2 pos, glm::vec2 size, rgba_color color) noexcept {
         pre_draw_check();
 
@@ -143,6 +194,25 @@ namespace iris {
             .color = color,
             .pos = pos / this->viewport_size_,
             .size = size / this->viewport_size_
+        };
+
+        this->drawcalls.push_back(std::move(dc));
+    }
+
+    void renderer::draw_texture(glm::vec2 pos, glm::vec2 size, const texture &tx) noexcept {
+        pre_draw_check();
+
+        gl_resources *res = reinterpret_cast<gl_resources*>(this->resources);
+
+        drawcall dc = {
+            .object = res->obj_quad,
+            .color = { 0, 0, 0, 0 },
+            .pos = pos / this->viewport_size_,
+            .size = size / this->viewport_size_,
+            .uniforms = {
+                { "texture_provided", i32(1) },
+                { "texture_", i32(tx.view()) }
+            }
         };
 
         this->drawcalls.push_back(std::move(dc));

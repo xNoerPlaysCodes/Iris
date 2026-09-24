@@ -32,18 +32,20 @@ namespace iris::gl {
         ~scoped_texture_unit();
     };
 
+    using uniform_value = std::variant<
+        f32,
+        glm::vec2,
+        glm::vec3,
+        glm::vec4,
+        i32,
+        glm::i32vec2,
+        glm::i32vec3,
+        glm::i32vec4
+    >;
+
     struct shader {
     public:
-        std::unordered_map<std::string, std::variant<
-            f32,
-            glm::vec2,
-            glm::vec3,
-            glm::vec4,
-            i32,
-            glm::i32vec2,
-            glm::i32vec3,
-            glm::i32vec4
-        >> uniforms;
+        std::unordered_map<std::string, uniform_value> uniforms;
         u32 gl_program = 0;
     public:
         void update_uniforms() const noexcept;
