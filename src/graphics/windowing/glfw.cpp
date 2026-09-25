@@ -91,6 +91,9 @@ namespace iris {
     void window::create(const std::string &title, glm::ivec2 size) noexcept {
         glfw_init();
         gpu_capabilities gpu_cap = gpu_capabilities::query();
+        if (gpu_cap.max_gl_version >= 43) {
+            glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+        }
         if (this->config.msaa_samples > 0) {
             if (!(this->config.msaa_samples == 2 || this->config.msaa_samples == 4 || this->config.msaa_samples == 8)) {
                 iris::error(error_code::invalid_configuration, std::format("MSAA Samples value {} is invalid, valid values are {}, {}, {}", static_cast<u32>(this->config.msaa_samples), 2, 4, 8));

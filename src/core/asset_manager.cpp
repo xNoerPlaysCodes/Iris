@@ -4,6 +4,7 @@
 #include <optional>
 #include <stop_token>
 #include <thread>
+#include "assert.hpp"
 #include "error.hpp"
 #include "lib/stb_image.h"
 
@@ -30,7 +31,23 @@ namespace iris {
 
         i32 width, height;
         i32 channels;
-        u8 *pixel_data = stbi_load_from_memory(data.data(), data.size(), &width, &height, &channels, 4);
+        u8 *pixel_data = stbi_load_from_memory(data.data(), data.size(), &width, &height, &channels, 0);
+
+        IrisAssert(pixel_data != nullptr);
+
+        if (channels < 4) {
+            u8 *new_pixel_data = new u8[width * height * 4];
+            for (size_t i = 0; i < (width * height); ++i) {
+                new_pixel_data[i*4+0] = pixel_data[i*3+0];
+                new_pixel_data[i*4+1] = pixel_data[i*3+1];
+                new_pixel_data[i*4+2] = pixel_data[i*3+2];
+                new_pixel_data[i*4+3] = 255;
+            }
+
+            stbi_image_free(pixel_data);
+            pixel_data = new_pixel_data;
+            channels = 4;
+        }
 
         struct image image = {
             .width = u32(width),

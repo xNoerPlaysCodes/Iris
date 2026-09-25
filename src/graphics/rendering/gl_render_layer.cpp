@@ -12,6 +12,55 @@
 
 using namespace iris::internal;
 
+namespace callback {
+    static void gl_debug(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, const void*) {
+        std::string srcStr;
+        switch (source) {
+            case GL_DEBUG_SOURCE_API:             srcStr = "API"; break;
+            case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   srcStr = "Window System"; break;
+            case GL_DEBUG_SOURCE_SHADER_COMPILER: srcStr = "Shader Compiler"; break;
+            case GL_DEBUG_SOURCE_THIRD_PARTY:     srcStr = "Third Party"; break;
+            case GL_DEBUG_SOURCE_APPLICATION:     srcStr = "Application"; break;
+            case GL_DEBUG_SOURCE_OTHER:           srcStr = "Other"; break;
+        }
+
+        std::string typeStr;
+        switch (type) {
+            case GL_DEBUG_TYPE_ERROR:               typeStr = "Error"; break;
+            case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: typeStr = "Deprecated Behavior"; break;
+            case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  typeStr = "Undefined Behavior"; break;
+            case GL_DEBUG_TYPE_PORTABILITY:         typeStr = "Portability"; break;
+            case GL_DEBUG_TYPE_PERFORMANCE:         typeStr = "Performance"; break;
+            case GL_DEBUG_TYPE_MARKER:              typeStr = "Marker"; break;
+            case GL_DEBUG_TYPE_PUSH_GROUP:          typeStr = "Push Group"; break;
+            case GL_DEBUG_TYPE_POP_GROUP:           typeStr = "Pop Group"; break;
+            case GL_DEBUG_TYPE_OTHER:               typeStr = "Other"; break;
+        }
+
+        std::string sevStr;
+        switch (severity) {
+            case GL_DEBUG_SEVERITY_HIGH:         sevStr = "High"; break;
+            case GL_DEBUG_SEVERITY_MEDIUM:       sevStr = "Medium"; break;
+            case GL_DEBUG_SEVERITY_LOW:          sevStr = "Low"; break;
+            case GL_DEBUG_SEVERITY_NOTIFICATION: sevStr = "Notification"; break;
+        }
+
+        std::vector<std::string> log_messages = {
+            "Error Caught at:",
+            "   Type: " + typeStr,
+            "   Severity: " + sevStr,
+            "   ID: " + std::to_string(id),
+            "   Message: " + std::string(message),
+            "   Source: " + srcStr,
+        };
+
+        for (const auto &l : log_messages) {
+            spdlog::error("{}", l);
+        }
+    }
+}
+
+
 namespace iris::gl {
     std::string replace_all(std::string str, const std::string &from, const std::string &to) {
         if (from.empty())
@@ -44,15 +93,25 @@ namespace iris::gl {
 
         glCompileShader(vert);
         glGetShaderInfoLog(vert, 512, nullptr, log);
+        bool unsucessful = false;
         if (log[0] != 0) {
-            spdlog::debug("logV: {}", log);
+            spdlog::error("Vertex Shader Compilation: {}", log);
+            unsucessful = true;
         }
         glCompileShader(frag);
         memset(log, 0, 512);
         glGetShaderInfoLog(frag, 512, nullptr, log);
         if (log[0] != 0) {
-            spdlog::debug("logF: {}", log);
+            spdlog::error("Fragment Shader Compilation: {}", log);
+            unsucessful = true;
         }
+
+#ifdef Iris_Debug
+        if (unsucessful) {
+            iris::error(error_code::gl_error, "Shader compilation failed");
+            std::exit(1);
+        }
+#endif
 
         u32 prog = glCreateProgram();
         glAttachShader(prog, vert);
@@ -89,6 +148,24 @@ namespace iris::gl {
 
         spdlog::info("OpenGL initialized on \"{}\"", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
         spdlog::debug("GL_MAX_TEXTURE_IMAGE_UNITS: {} (hardware {})", g_state.gl_state.max_texture_units, units);
+
+
+        i32 flags;
+        glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+
+        if (flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+            glEnable(GL_DEBUG_OUTPUT);
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            glDebugMessageControl(
+                GL_DONT_CARE,  // source
+                GL_DONT_CARE,  // type
+                GL_DEBUG_SEVERITY_LOW,  // severity to filter
+                0,             // count of ids to filter
+                nullptr,       // ids array
+                GL_TRUE       // GL_TRUE to enable, GL_FALSE to disable
+            );
+            glDebugMessageCallback(callback::gl_debug, nullptr);
+        }
     }
 
     void check_error(i32 n) noexcept {
@@ -144,6 +221,7 @@ namespace iris::gl {
             const GLint location = glGetUniformLocation(this->gl_program, name.c_str());
 
             if (location == -1) {
+                spdlog::warn("Couldn't find shader location '{}'", name);
                 continue;
             }
 

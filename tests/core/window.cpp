@@ -18,7 +18,7 @@ void iris_main(const iris_main_arguments &) {
         renderer.clear();
         {
             static glm::vec2 pos = { 0, 0 };
-            renderer.draw_rectangle(pos, { 40, 40 }, { 255, 255, 255, 255 });
+            renderer.draw_rectangle(pos, { 40, 40 }, { 255, 255, 0, 255 });
             if (window.key_state(iris::io::key::w).down()) {
                 pos.y -= 1.f;
             }

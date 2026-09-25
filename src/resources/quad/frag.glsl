@@ -13,7 +13,7 @@ in vec2 v_uv;
 out vec4 FragColor;
 void main() {
     if (p_texture_provided == 1) {
-        FragColor = vec4(texture(p_texture, v_uv).xyz, 1.);
+        FragColor = texture(p_texture, v_uv);
     } else {
         FragColor = p_color;
     }

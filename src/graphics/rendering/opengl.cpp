@@ -18,6 +18,15 @@ namespace iris {
         struct gl_resources {
             gl::object obj_quad;
         };
+
+        glm::vec4 rgba_color_to_vec4(rgba_color col) noexcept {
+            return {
+                static_cast<float>(col.r) / 255,
+                static_cast<float>(col.g) / 255,
+                static_cast<float>(col.b) / 255,
+                static_cast<float>(col.a) / 255,
+            };
+        }
     }
 
     struct renderer::drawcall {
@@ -103,6 +112,14 @@ namespace iris {
                 dc.object.shader.update_uniforms();
             }
 
+            dc.object.shader.uniforms.try_emplace("p_color", glm::vec4{});
+            if (auto &val = std::get<glm::vec4>(dc.object.shader.uniforms.at("p_color"));
+                rgba_color_to_vec4(dc.color) != val)
+            {
+                val = rgba_color_to_vec4(dc.color);
+                dc.object.shader.update_uniforms();
+            }
+
             for (auto &[k, v] : dc.uniforms) {
                 dc.object.shader.uniforms.try_emplace(k, std::remove_cvref_t<decltype(v)>{});
                 if (auto &val = dc.object.shader.uniforms.at(k); val != v) {
@@ -114,7 +131,7 @@ namespace iris {
             gl::scoped_texture_unit unit;
 
             if (dc.texture != 0) {
-                glActiveTexture(unit());
+                glActiveTexture(GL_TEXTURE0 + unit());
                 glBindTexture(GL_TEXTURE_2D, dc.texture);
 
                 dc.object.shader.uniforms.try_emplace("p_texture", i32{});
@@ -135,9 +152,9 @@ namespace iris {
             }
 
             glBindVertexArray(dc.object.vao);
-            glDrawElements(GL_TRIANGLES, dc.object.indices, GL_UNSIGNED_INT, nullptr);
+            glDrawElementsInstanced(GL_TRIANGLES, dc.object.indices, GL_UNSIGNED_INT, nullptr, 5);
 
-            glActiveTexture(0);
+            glActiveTexture(GL_TEXTURE0);
         }
         this->drawcalls.clear();
     }
