@@ -25,6 +25,7 @@ namespace iris {
         rgba_color color;
         glm::vec2 pos;
         glm::vec2 size;
+        u32 texture = 0;
         std::unordered_map<std::string, gl::uniform_value> uniforms;
     };
 
@@ -57,7 +58,6 @@ namespace iris {
             shader_version_string = "#version 330 core\n";
         }
         gl::shader shader = gl::compile_debug_shader(shader_version_string);
-        shader.uniforms["p_color"] = glm::vec4(1, 0, 0, 1);
         shader.update_uniforms();
         reinterpret_cast<gl_resources*>(this->resources)->obj_quad = gl::create_object({ 0, 0, 1, 0, 1, 1, 0, 1 }, { 0, 1, 2, 2, 3, 0, }, shader);
     }
@@ -87,16 +87,16 @@ namespace iris {
         for (auto &dc : this->drawcalls) {
             glUseProgram(dc.object.shader.gl_program);
 
-            dc.object.shader.uniforms.try_emplace("iris_pos", glm::vec2{});
-            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("iris_pos"));
+            dc.object.shader.uniforms.try_emplace("p_pos", glm::vec2{});
+            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_pos"));
                 dc.pos != val)
             {
                 val = dc.pos;
                 dc.object.shader.update_uniforms();
             }
 
-            dc.object.shader.uniforms.try_emplace("iris_size", glm::vec2{});
-            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("iris_size"));
+            dc.object.shader.uniforms.try_emplace("p_size", glm::vec2{});
+            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_size"));
                 dc.size != val)
             {
                 val = dc.size;
@@ -111,8 +111,33 @@ namespace iris {
                 }
             }
 
+            gl::scoped_texture_unit unit;
+
+            if (dc.texture != 0) {
+                glActiveTexture(unit());
+                glBindTexture(GL_TEXTURE_2D, dc.texture);
+
+                dc.object.shader.uniforms.try_emplace("p_texture", i32{});
+                dc.object.shader.uniforms.try_emplace("p_texture_provided", i32{});
+                if (auto &val = std::get<i32>(dc.object.shader.uniforms.at("p_texture"));
+                    i32(unit()) != val)
+                {
+                    val = i32(unit());
+                    dc.object.shader.update_uniforms();
+                }
+
+                if (auto &val = std::get<i32>(dc.object.shader.uniforms.at("p_texture_provided"));
+                    val != 1)
+                {
+                    val = 1;
+                    dc.object.shader.update_uniforms();
+                }
+            }
+
             glBindVertexArray(dc.object.vao);
             glDrawElements(GL_TRIANGLES, dc.object.indices, GL_UNSIGNED_INT, nullptr);
+
+            glActiveTexture(0);
         }
         this->drawcalls.clear();
     }
@@ -209,10 +234,7 @@ namespace iris {
             .color = { 0, 0, 0, 0 },
             .pos = pos / this->viewport_size_,
             .size = size / this->viewport_size_,
-            .uniforms = {
-                { "texture_provided", i32(1) },
-                { "texture_", i32(tx.view()) }
-            }
+            .texture = tx.view(),
         };
 
         this->drawcalls.push_back(std::move(dc));

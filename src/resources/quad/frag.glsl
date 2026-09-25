@@ -2,13 +2,18 @@
 precision highp float;
 uniform vec4 p_color;
 
-uniform sampler2D texture_;
-uniform int texture_provided;
+uniform sampler2D p_texture;
+uniform int p_texture_provided;
+
+uniform vec2 p_pos;
+uniform vec2 p_size;
+
+in vec2 v_uv;
 
 out vec4 FragColor;
 void main() {
-    if (texture_provided == 1) {
-        FragColor = texture(texture_, gl_FragCoord.xy);
+    if (p_texture_provided == 1) {
+        FragColor = vec4(texture(p_texture, v_uv).xyz, 1.);
     } else {
         FragColor = p_color;
     }

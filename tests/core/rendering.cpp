@@ -11,7 +11,7 @@ void iris_main(const iris_main_arguments &) {
     iris::window window = { "Iris — Core Window Test", { 800, 600 } };
     iris::renderer renderer(window);
     iris::asset_manager am;
-    am.load_image("/home/noerlol/Pictures/fox.jpg", "test");
+    am.load_image("/Users/noerlol/Pictures/noerlol.png", "test");
     iris::texture tx = renderer.load_texture(*am.image("test"));
 
     while (window.running()) {

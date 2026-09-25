@@ -70,10 +70,10 @@ namespace iris::gl {
     void init(const init_config &cfg) noexcept {
         gl::gl_init(); // glewInit() basically
         glViewport(
-            static_cast<i32>(cfg.viewport_size.x),
-            static_cast<i32>(cfg.viewport_size.y),
             static_cast<i32>(cfg.viewport_offset.x),
-            static_cast<i32>(cfg.viewport_offset.y)
+            static_cast<i32>(cfg.viewport_offset.y),
+            static_cast<i32>(cfg.viewport_size.x),
+            static_cast<i32>(cfg.viewport_size.y)
         );
 
         glEnable(GL_BLEND);
@@ -144,7 +144,6 @@ namespace iris::gl {
             const GLint location = glGetUniformLocation(this->gl_program, name.c_str());
 
             if (location == -1) {
-                iris::error(error_code::missing_shader_uniform_location, std::format("'{}'", name));
                 continue;
             }
 
