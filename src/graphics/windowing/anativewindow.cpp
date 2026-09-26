@@ -167,6 +167,8 @@ namespace iris {
                 eglMakeCurrent(hdl->display, surface, surface, hdl->context);
             }
         };
+
+        this->make_gl_context_current();
     }
 
     void window::make_gl_context_current() const noexcept {

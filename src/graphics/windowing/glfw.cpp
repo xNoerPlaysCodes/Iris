@@ -130,16 +130,13 @@ namespace iris {
         // whatever i'll keep this?
         glfwShowWindow(reinterpret_cast<GLFWwindow*>(this->handle));
 
-        GLFWwindow *cur_ctx = glfwGetCurrentContext();
-        glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(this->handle));
+        this->make_gl_context_current();
 
         if (this->config.vsync) {
             glfwSwapInterval(1);
         } else {
             glfwSwapInterval(0);
         }
-
-        glfwMakeContextCurrent(cur_ctx);
     }
 
     glm::ivec2 window::framebuffer_size() const noexcept {

@@ -55,17 +55,30 @@ namespace iris::gl {
         ~shader() = default;
     };
 
+    struct instance {
+        glm::vec2 pos;
+        glm::vec2 size;
+        glm::vec4 color;
+    };
+
     struct object {
     public:
+        enum class type {
+            none = 0,
+            quad
+        } type = type::none;
+
         shader shader;
         u32 indices = 0;
         u32 vao = 0;
         u32 vbo = 0;
+        u32 inst_vbo = 0;
+        u32 inst_vbo_size = sizeof(instance);
         u32 ebo = 0;
     public:
-        object(u32 indices, u32 vao, u32 vbo, u32 ebo, struct shader shader) noexcept;
+        object(u32 indices, u32 vao, u32 vbo, u32 inst_vbo, u32 ebo, struct shader shader) noexcept;
         object() noexcept = default;
-        ~object() = default;        
+        ~object();
     };
 
     u32 compile_debug_shader(std::string shader_version_str) noexcept;

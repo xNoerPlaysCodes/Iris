@@ -17,5 +17,5 @@ void main() {
     );
     v_uv = vec2(a_pos.x, a_pos.y);
     v_color = i_color;
-    gl_Position = vec4(i_pos.xy, 1.0, 1.0);
+    gl_Position = vec4(ndc.xy, 1.0, 1.0);
 }

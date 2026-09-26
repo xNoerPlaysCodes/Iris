@@ -4,6 +4,7 @@
 #include "state.hpp"
 #include "bitutil.hpp"
 
+#include <cstddef>
 #include <gl.h>
 
 #include <quad_frag.glsl.h>
@@ -201,17 +202,25 @@ namespace iris::gl {
         bitutil::setr(this->unit, g_state.gl_state.texture_unit_freelist);
     }
 
-    object::object(u32 indices, u32 vao, u32 vbo, u32 ebo, struct shader shader) noexcept
+    object::object(u32 indices, u32 vao, u32 vbo, u32 inst_vbo, u32 ebo, struct shader shader) noexcept
         : shader(shader)
         , indices(indices)
         , vao(vao)
         , vbo(vbo)
+        , inst_vbo(inst_vbo)
         , ebo(ebo)
     {
-        if (vao == 0 || vbo == 0 || ebo == 0) {
-            error(error_code::invalid_gl_object, std::format("One of the OpenGL objects were invalid: (vao, vbo, ebo) {}, {}, {}", vao, vbo, ebo));
-            std::exit(0);
+        if (vao == 0 || vbo == 0 || inst_vbo == 0 || ebo == 0) {
+            error(error_code::invalid_gl_object, std::format("One of the OpenGL objects were invalid: (vao, vbo, inst_vbo, ebo) {}, {}, {}", vao, vbo, inst_vbo, ebo));
+            std::exit(1);
         }
+    }
+
+    object::~object() {
+        // glDeleteVertexArrays(1, &this->vao);
+        // glDeleteBuffers(1, &this->vbo);
+        // glDeleteBuffers(1, &this->ebo);
+        // glDeleteBuffers(1, &this->inst_vbo);
     }
 
     void shader::update_uniforms() const noexcept {
@@ -221,7 +230,7 @@ namespace iris::gl {
             const GLint location = glGetUniformLocation(this->gl_program, name.c_str());
 
             if (location == -1) {
-                spdlog::warn("Couldn't find shader location '{}'", name);
+                spdlog::warn("Couldn't find uniform '{}'", name);
                 continue;
             }
 
@@ -252,6 +261,7 @@ namespace iris::gl {
     object create_object(const std::vector<float> &vertices, const std::vector<u32> &indices, shader shader, i32 stride_size, i32 draw_type) noexcept {
         u32 vao;
         u32 vbo;
+        u32 inst_vbo;
         u32 ebo;
 
         glGenVertexArrays(1, &vao);
@@ -265,14 +275,30 @@ namespace iris::gl {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(u32), indices.data(), draw_type);
 
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride_size * sizeof(float), 0);
         glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, stride_size * sizeof(float), 0);
+
+        glGenBuffers(1, &inst_vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, inst_vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(instance), nullptr, GL_STREAM_DRAW);
+
+        glEnableVertexAttribArray(1);
+        glEnableVertexAttribArray(2);
+        glEnableVertexAttribArray(3);
+
+        glVertexAttribDivisor(1, 1);
+        glVertexAttribDivisor(2, 1);
+        glVertexAttribDivisor(3, 1);
+
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, pos));
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, size));
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, color));
         // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride_size, 0);
         // glEnableVertexAttribArray(1);
 
         glBindVertexArray(0);
 
-        return object(indices.size(), vao, vbo, ebo, shader);
+        return object(indices.size(), vao, vbo, inst_vbo, ebo, shader);
     }
 
     void deinit() noexcept {}

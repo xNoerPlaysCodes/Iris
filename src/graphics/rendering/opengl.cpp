@@ -3,6 +3,7 @@
 #include "iris/core/asset_manager.hpp"
 #include "iris/runtime.hpp"
 #include "iris/types.hpp"
+#include <chrono>
 #include <cstddef>
 #include <fstream>
 #include <iris/graphics/rendering.hpp>
@@ -11,6 +12,7 @@
 #include "spdlog/spdlog.h"
 #include <assert.hpp>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include "lib/stb_truetype.h"
 #include "state.hpp"
@@ -31,15 +33,9 @@ namespace iris {
         }
     }
 
-    struct instance {
-        glm::vec2 pos;
-        glm::vec2 size;
-        glm::vec4 color;
-    };
-
     struct renderer::drawcall {
         std::unordered_map<std::string, gl::uniform_value> uniforms;
-        instance instance;
+        gl::instance instance;
         gl::object &object;
         u32 texture = 0;
     };
@@ -49,7 +45,6 @@ namespace iris {
     {
         this->config.gles = window.config.gles;
         this->resources = new gl_resources();
-        window.make_gl_context_current();
         gl::init({
             .viewport_size = cfg.viewport_size_override != glm::vec2 { -1, -1 } 
                             ? cfg.viewport_size_override 
@@ -74,7 +69,9 @@ namespace iris {
         }
         gl::shader shader = gl::compile_debug_shader(shader_version_string);
         shader.update_uniforms();
-        reinterpret_cast<gl_resources*>(this->resources)->obj_quad = gl::create_object({ 0, 0, 1, 0, 1, 1, 0, 1 }, { 0, 1, 2, 2, 3, 0, }, shader);
+        gl_resources *res = reinterpret_cast<gl_resources*>(this->resources);
+        res->obj_quad = gl::create_object({ 0, 0, 1, 0, 1, 1, 0, 1 }, { 0, 1, 2, 2, 3, 0, }, shader);
+        res->obj_quad.type = gl::object::type::quad;
     }
 
     void renderer::begin_frame() noexcept {
@@ -99,32 +96,39 @@ namespace iris {
     }
 
     void renderer::flush_drawcalls() noexcept {
-        for (auto &dc : this->drawcalls) {
-            glUseProgram(dc.object.shader.gl_program);
+        std::vector<gl::instance> rect_instances;
+        rect_instances.reserve(this->drawcalls.size());
 
-            // dc.object.shader.uniforms.try_emplace("p_pos", glm::vec2{});
-            // if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_pos"));
-            //     dc.instance.pos != val)
-            // {
-            //     val = dc.instance.pos;
-            //     dc.object.shader.update_uniforms();
-            // }
-            //
-            // dc.object.shader.uniforms.try_emplace("p_size", glm::vec2{});
-            // if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_size"));
-            //     dc.instance.size != val)
-            // {
-            //     val = dc.instance.size;
-            //     dc.object.shader.update_uniforms();
-            // }
-            //
-            // dc.object.shader.uniforms.try_emplace("p_color", glm::vec4{});
-            // if (auto &val = std::get<glm::vec4>(dc.object.shader.uniforms.at("p_color"));
-            //     dc.instance.color != val)
-            // {
-            //     val = rgba_color_to_vec4(dc.instance.color);
-            //     dc.object.shader.update_uniforms();
-            // }
+        auto is_instanceable = [](const drawcall &dc) -> bool {
+            return dc.object.type == gl::object::type::quad
+                && dc.texture == 0; // TODO: Add texture instancing asw!!!
+        };
+
+        for (auto &dc : this->drawcalls) {
+            if (!is_instanceable(dc)) continue;
+            rect_instances.push_back(std::move(dc.instance));
+        }
+
+        gl::object &quad_obj = reinterpret_cast<gl_resources*>(this->resources)->obj_quad;
+        u32 buffer_size = quad_obj.inst_vbo_size;
+        u32 required_buffer_size = sizeof(gl::instance) * rect_instances.size();
+        bool uploaded = false;
+        if (buffer_size < required_buffer_size) {
+            glBufferData(GL_ARRAY_BUFFER, required_buffer_size, rect_instances.data(), GL_STREAM_DRAW);
+            quad_obj.inst_vbo_size = buffer_size;
+            uploaded = true;
+        }
+        glBindVertexArray(quad_obj.vao);
+        glBindBuffer(GL_ARRAY_BUFFER, quad_obj.inst_vbo);
+        if (!uploaded) {
+            glBufferSubData(GL_ARRAY_BUFFER, 0, required_buffer_size, rect_instances.data());
+        }
+        glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr, rect_instances.size());
+
+        for (auto &dc : this->drawcalls) {
+            if (is_instanceable(dc)) continue;
+
+            glUseProgram(dc.object.shader.gl_program);
 
             for (auto &[k, v] : dc.uniforms) {
                 dc.object.shader.uniforms.try_emplace(k, std::remove_cvref_t<decltype(v)>{});
@@ -136,7 +140,14 @@ namespace iris {
 
             gl::scoped_texture_unit unit;
 
-            if (dc.texture != 0) {
+            if (dc.texture == 0) {
+                if (auto &val = std::get<i32>(dc.object.shader.uniforms.at("p_texture_provided"));
+                    val != 0)
+                {
+                    val = 0;
+                    dc.object.shader.update_uniforms();
+                }
+            } else {
                 glActiveTexture(GL_TEXTURE0 + unit());
                 glBindTexture(GL_TEXTURE_2D, dc.texture);
 
@@ -157,16 +168,7 @@ namespace iris {
                 }
             }
 
-            glBindVertexArray(dc.object.vao);
-            // TODO: instance it acutally
-            std::vector<instance> instances = { dc.instance };
-            glBindBuffer(GL_ARRAY_BUFFER, dc.object.vbo);
-            glBufferData(GL_ARRAY_BUFFER, instances.size() * sizeof(instance), nullptr, GL_STREAM_DRAW);  // orphan
-            glBufferSubData(GL_ARRAY_BUFFER, 0, instances.size() * sizeof(instance), instances.data());
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 0, &instances[0].pos);
-
-            glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, 0, &instances[0].size);
-            glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr, instances.size());
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 
             glActiveTexture(GL_TEXTURE0);
         }
