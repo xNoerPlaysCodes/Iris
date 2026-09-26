@@ -3,9 +3,11 @@
 #include "iris/core/asset_manager.hpp"
 #include "iris/runtime.hpp"
 #include "iris/types.hpp"
+#include <cstddef>
 #include <fstream>
 #include <iris/graphics/rendering.hpp>
 #include "gl_render_layer.hpp"
+#include "nutils/types.hpp"
 #include "spdlog/spdlog.h"
 #include <assert.hpp>
 #include <string>
@@ -29,13 +31,17 @@ namespace iris {
         }
     }
 
-    struct renderer::drawcall {
-        gl::object &object;
-        rgba_color color;
+    struct instance {
         glm::vec2 pos;
         glm::vec2 size;
-        u32 texture = 0;
+        glm::vec4 color;
+    };
+
+    struct renderer::drawcall {
         std::unordered_map<std::string, gl::uniform_value> uniforms;
+        instance instance;
+        gl::object &object;
+        u32 texture = 0;
     };
 
     renderer::renderer(const class window &window, struct config cfg) noexcept
@@ -96,29 +102,29 @@ namespace iris {
         for (auto &dc : this->drawcalls) {
             glUseProgram(dc.object.shader.gl_program);
 
-            dc.object.shader.uniforms.try_emplace("p_pos", glm::vec2{});
-            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_pos"));
-                dc.pos != val)
-            {
-                val = dc.pos;
-                dc.object.shader.update_uniforms();
-            }
-
-            dc.object.shader.uniforms.try_emplace("p_size", glm::vec2{});
-            if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_size"));
-                dc.size != val)
-            {
-                val = dc.size;
-                dc.object.shader.update_uniforms();
-            }
-
-            dc.object.shader.uniforms.try_emplace("p_color", glm::vec4{});
-            if (auto &val = std::get<glm::vec4>(dc.object.shader.uniforms.at("p_color"));
-                rgba_color_to_vec4(dc.color) != val)
-            {
-                val = rgba_color_to_vec4(dc.color);
-                dc.object.shader.update_uniforms();
-            }
+            // dc.object.shader.uniforms.try_emplace("p_pos", glm::vec2{});
+            // if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_pos"));
+            //     dc.instance.pos != val)
+            // {
+            //     val = dc.instance.pos;
+            //     dc.object.shader.update_uniforms();
+            // }
+            //
+            // dc.object.shader.uniforms.try_emplace("p_size", glm::vec2{});
+            // if (auto &val = std::get<glm::vec2>(dc.object.shader.uniforms.at("p_size"));
+            //     dc.instance.size != val)
+            // {
+            //     val = dc.instance.size;
+            //     dc.object.shader.update_uniforms();
+            // }
+            //
+            // dc.object.shader.uniforms.try_emplace("p_color", glm::vec4{});
+            // if (auto &val = std::get<glm::vec4>(dc.object.shader.uniforms.at("p_color"));
+            //     dc.instance.color != val)
+            // {
+            //     val = rgba_color_to_vec4(dc.instance.color);
+            //     dc.object.shader.update_uniforms();
+            // }
 
             for (auto &[k, v] : dc.uniforms) {
                 dc.object.shader.uniforms.try_emplace(k, std::remove_cvref_t<decltype(v)>{});
@@ -152,7 +158,15 @@ namespace iris {
             }
 
             glBindVertexArray(dc.object.vao);
-            glDrawElementsInstanced(GL_TRIANGLES, dc.object.indices, GL_UNSIGNED_INT, nullptr, 5);
+            // TODO: instance it acutally
+            std::vector<instance> instances = { dc.instance };
+            glBindBuffer(GL_ARRAY_BUFFER, dc.object.vbo);
+            glBufferData(GL_ARRAY_BUFFER, instances.size() * sizeof(instance), nullptr, GL_STREAM_DRAW);  // orphan
+            glBufferSubData(GL_ARRAY_BUFFER, 0, instances.size() * sizeof(instance), instances.data());
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_TRUE, 0, &instances[0].pos);
+
+            glVertexAttribPointer(2, 2, GL_FLOAT, GL_TRUE, 0, &instances[0].size);
+            glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr, instances.size());
 
             glActiveTexture(GL_TEXTURE0);
         }
@@ -184,8 +198,6 @@ namespace iris {
 #ifdef Iris_Debug
     void renderer::debug() noexcept {
         pre_draw_check();
-        gl_resources *res = reinterpret_cast<gl_resources*>(this->resources); 
-        this->drawcalls.emplace_back(res->obj_quad, rgba_color { 255, 255, 0, 255 }, glm::vec2 { 50, 50 } / this->viewport_size_, glm::vec2 { 200, 200 } / this->viewport_size_);
     }
 #endif
 
@@ -232,10 +244,12 @@ namespace iris {
         gl_resources *res = reinterpret_cast<gl_resources*>(this->resources);
 
         drawcall dc = {
+            .instance = {
+                .pos = pos / this->viewport_size_,
+                .size = size / this->viewport_size_,
+                .color = rgba_color_to_vec4(color)
+            },
             .object = res->obj_quad,
-            .color = color,
-            .pos = pos / this->viewport_size_,
-            .size = size / this->viewport_size_
         };
 
         this->drawcalls.push_back(std::move(dc));
@@ -247,10 +261,12 @@ namespace iris {
         gl_resources *res = reinterpret_cast<gl_resources*>(this->resources);
 
         drawcall dc = {
+            .instance = {
+                .pos = pos / this->viewport_size_,
+                .size = size / this->viewport_size_,
+                .color = { 0, 0, 0, 0 }
+            },
             .object = res->obj_quad,
-            .color = { 0, 0, 0, 0 },
-            .pos = pos / this->viewport_size_,
-            .size = size / this->viewport_size_,
             .texture = tx.view(),
         };
 

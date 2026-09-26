@@ -1,6 +1,7 @@
 build/*
 .cache/*
 bin/*
+!bin/resources
 src/include/resources/*
 native_test_dir/*
 configure_cmake_*
