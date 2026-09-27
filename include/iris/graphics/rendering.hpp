@@ -7,20 +7,22 @@
 #include "iris/graphics/windowing.hpp"
 
 namespace iris {
+    namespace gl {
+        struct framebuffer;
+    }
+
     class renderer {
     public:
         struct config {
             glm::vec2 viewport_size_override;
             glm::vec2 viewport_offset_override;
             u32 fps;
-            bool depth : 1;
             bool gles : 1;
 
             config() noexcept
                 : viewport_size_override(-1, -1)
                 , viewport_offset_override(-1, -1)
                 , fps(60)
-                , depth(false)
                 , gles(false)
             {};
 
@@ -31,17 +33,20 @@ namespace iris {
         static constexpr u32 filter_linear = 0x2;
     private:
         struct drawcall;
+        constexpr static f32 max_z_order = 1024.f;
 
         std::vector<drawcall> drawcalls;
         config config;
         const window &window;
         glm::vec2 viewport_size_;
-        glm::vec2 viewport_offset_;
+        glm::vec2 viewport_offset_ = { 0, 0 };
+        f32 z_order = max_z_order;
         void *resources = nullptr;
         bool begin_frame_called = false;
 
         void pre_draw_check() const noexcept;
         void flush_drawcalls() noexcept;
+        [[nodiscard]] gl::framebuffer create_framebuffer(glm::vec2 size) const noexcept;
     public:
         /// @brief Clear the screen
         void clear(rgba_color color = { 14, 14, 14, 255 }) noexcept;

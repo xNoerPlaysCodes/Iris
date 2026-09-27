@@ -22,8 +22,9 @@ void iris_main(const iris_main_arguments &) {
         renderer.clear();
         {
             static glm::vec2 pos = { 0, 0 };
-            renderer.draw_texture(pos, { 256, 256 }, tx);
             renderer.draw_rectangle({ 0, 700 }, { 256, 256 }, { 255, 0, 255, 255 });
+            renderer.draw_texture(pos, { 256, 256 }, tx);
+            renderer.draw_rectangle({ 0, 300 }, { 256, 256 }, { 255, 0, 255, 255 });
             if (window.key_state(iris::io::key::w).down()) {
                 pos.y -= 1.f;
             }

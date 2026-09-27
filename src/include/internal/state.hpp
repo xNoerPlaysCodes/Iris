@@ -12,8 +12,11 @@
 namespace iris::internal {
     struct global_state {
         struct {
-            u32 bound_framebuffer = 0;
+            gl::framebuffer default_fb = {};
+            gl::framebuffer bound_fb = {};
             u32 bound_texture = 0;
+            u32 bound_program = 0;
+
             u32 texture_unit_freelist = 0;
             i32 max_texture_units = 0;
             u32 gl_version = 0;

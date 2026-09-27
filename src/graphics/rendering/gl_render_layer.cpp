@@ -7,9 +7,9 @@
 #include <cstddef>
 #include <gl.h>
 
-#include <quad_frag.glsl.h>
-#include <quad_vert.glsl.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <string>
+#include <string_view>
 
 using namespace iris::internal;
 
@@ -75,10 +75,10 @@ namespace iris::gl {
 
         return str;
     }
-    u32 compile_debug_shader(std::string shader_version_string) noexcept {
-        std::string vertex = quad_vert;
+    u32 compile_shader(std::string shader_version_string, std::string_view v, std::string_view f) noexcept {
+        std::string vertex = v.data();
         vertex = replace_all(vertex, "//iris_replace_glsl_version", shader_version_string);
-        std::string fragment = quad_frag;
+        std::string fragment = f.data();
         fragment = replace_all(fragment, "//iris_replace_glsl_version", shader_version_string);
 
         const char *vcs = vertex.c_str();
@@ -147,9 +147,11 @@ namespace iris::gl {
             bitutil::setr(i, g_state.gl_state.texture_unit_freelist);
         }
 
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(std::to_underlying(cfg.depth_func));
+
         spdlog::info("OpenGL initialized on \"{}\"", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
         spdlog::debug("GL_MAX_TEXTURE_IMAGE_UNITS: {} (hardware {})", g_state.gl_state.max_texture_units, units);
-
 
         i32 flags;
         glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
@@ -209,12 +211,7 @@ namespace iris::gl {
         , vbo(vbo)
         , inst_vbo(inst_vbo)
         , ebo(ebo)
-    {
-        if (vao == 0 || vbo == 0 || inst_vbo == 0 || ebo == 0) {
-            error(error_code::invalid_gl_object, std::format("One of the OpenGL objects were invalid: (vao, vbo, inst_vbo, ebo) {}, {}, {}", vao, vbo, inst_vbo, ebo));
-            std::exit(1);
-        }
-    }
+    {}
 
     object::~object() {
         // glDeleteVertexArrays(1, &this->vao);
@@ -293,8 +290,6 @@ namespace iris::gl {
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, pos));
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, size));
         glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(instance), (void*) offsetof(instance, color));
-        // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride_size, 0);
-        // glEnableVertexAttribArray(1);
 
         glBindVertexArray(0);
 

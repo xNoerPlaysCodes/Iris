@@ -1,10 +1,12 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include "glm/ext/vector_float2.hpp"
 #include "nutils/types.hpp"
 #include <glm/glm.hpp>
 #include <gl.h>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -12,9 +14,9 @@
 namespace iris::gl {
     enum class depth_func : u32 {
         none = 0,
-        less,
-        equal,
-        greater,
+        less = GL_LESS,
+        equal = GL_EQUAL,
+        greater = GL_GREATER,
     };
 
     struct init_config {
@@ -55,17 +57,28 @@ namespace iris::gl {
         ~shader() = default;
     };
 
+    struct framebuffer {
+        glm::vec2 size;
+        u32 fbo = 0;
+        u32 color_tex = 0;
+        u32 depth_tex = 0;
+    };
+
     struct instance {
-        glm::vec2 pos;
+        glm::vec3 pos;
         glm::vec2 size;
         glm::vec4 color;
     };
+
+    static_assert(sizeof(f32) == 4);
+    static_assert(sizeof(instance) == 4*(3+2+4));
 
     struct object {
     public:
         enum class type {
             none = 0,
-            quad
+            quad,
+            fb_blit
         } type = type::none;
 
         shader shader;
@@ -81,7 +94,7 @@ namespace iris::gl {
         ~object();
     };
 
-    u32 compile_debug_shader(std::string shader_version_str) noexcept;
+    u32 compile_shader(std::string shader_version_string, std::string_view v, std::string_view f) noexcept;
 
     object create_object(const std::vector<float> &vertices, const std::vector<u32> &indices, shader shader, i32 stride_size = 2, i32 gl_draw_type = GL_STATIC_DRAW) noexcept;
 
