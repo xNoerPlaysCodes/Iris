@@ -127,7 +127,6 @@ namespace iris {
 
     void renderer::begin_frame() noexcept {
         this->begin_frame_called = true;
-        glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
     }
 
     gl::framebuffer renderer::create_framebuffer(glm::vec2 size) const noexcept {
@@ -185,6 +184,8 @@ namespace iris {
 
         glViewport(vp_offset.x, vp_offset.y, vp_size.x, vp_size.y);
 
+        this->flush_drawcalls(); // actually draw
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         glViewport(vp_offset.x, vp_offset.y, vp_size.x, vp_size.y);
@@ -193,22 +194,16 @@ namespace iris {
 
         {
             gl::scoped_texture_unit color;
-            gl::scoped_texture_unit depth;
 
             glActiveTexture(GL_TEXTURE0 + color());
             glBindTexture(GL_TEXTURE_2D, internal::g_state.gl_state.default_fb.color_tex);
 
-            glActiveTexture(GL_TEXTURE0 + depth());
-            glBindTexture(GL_TEXTURE_2D, internal::g_state.gl_state.default_fb.depth_tex);
-
             glUseProgram(res->obj_fb_blit.shader.gl_program);
-            glUniform1i(glGetUniformLocation(res->obj_fb_blit.shader.gl_program, "p_texture"), GL_TEXTURE0 + color());
-            glUniform1i(glGetUniformLocation(res->obj_fb_blit.shader.gl_program, "p_depth"), GL_TEXTURE0 + depth());
+            glUniform1i(glGetUniformLocation(res->obj_fb_blit.shader.gl_program, "p_texture"), color());
             glBindVertexArray(res->obj_fb_blit.vao);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
         }
 
-        this->flush_drawcalls(); // actually draw
         this->z_order = max_z_order;
 
         this->begin_frame_called = !this->begin_frame_called;
@@ -309,7 +304,7 @@ namespace iris {
     void renderer::clear(rgba_color color) noexcept {
         pre_draw_check();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+        glClearColor(1.f, 0.f, 1.f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
         glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
