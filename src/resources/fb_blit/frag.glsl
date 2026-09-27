@@ -7,5 +7,5 @@ in vec2 v_uv;
 out vec4 FragColor;
 
 void main() {
-    FragColor = vec4(vec3(1.0) - texture(p_texture, v_uv).rgb, 1.0);
+    FragColor = texture(p_texture, vec2(v_uv.x, 1. - v_uv.y));
 }

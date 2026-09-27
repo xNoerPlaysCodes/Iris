@@ -90,7 +90,7 @@ namespace iris {
         res->obj_quad.type = gl::object::type::quad;
 
         gl::shader blit_shader = gl::compile_shader(shader_version_string, fb_blit_vert, fb_blit_frag);
-        quad_shader.update_uniforms();
+        blit_shader.update_uniforms();
 
         u32 vao;
         u32 vbo;
@@ -135,7 +135,7 @@ namespace iris {
         glBindFramebuffer(GL_FRAMEBUFFER, fb.fbo);
         glGenTextures(1, &fb.color_tex);
         glBindTexture(GL_TEXTURE_2D, fb.color_tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, this->viewport_size_.x, this->viewport_size_.y, 0, GL_RGBA, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, size.x, size.y, 0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fb.color_tex, 0);
@@ -193,6 +193,7 @@ namespace iris {
         gl_resources *res = reinterpret_cast<gl_resources*>(this->resources);
 
         {
+            glDisable(GL_DEPTH_TEST);
             gl::scoped_texture_unit color;
 
             glActiveTexture(GL_TEXTURE0 + color());
@@ -202,6 +203,8 @@ namespace iris {
             glUniform1i(glGetUniformLocation(res->obj_fb_blit.shader.gl_program, "p_texture"), color());
             glBindVertexArray(res->obj_fb_blit.vao);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+
+            glEnable(GL_DEPTH_TEST);
         }
 
         this->z_order = max_z_order;
@@ -304,7 +307,7 @@ namespace iris {
     void renderer::clear(rgba_color color) noexcept {
         pre_draw_check();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(1.f, 0.f, 1.f, 1.f);
+        glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
         glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
