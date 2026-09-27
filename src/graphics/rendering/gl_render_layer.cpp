@@ -10,9 +10,11 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <string_view>
+#include <iris/platform_macros.hpp>
 
 using namespace iris::internal;
 
+#ifdef Iris_Platform_Desktop
 namespace callback {
     static void gl_debug(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei, const GLchar* message, const void*) {
         std::string srcStr;
@@ -60,7 +62,7 @@ namespace callback {
         }
     }
 }
-
+#endif
 
 namespace iris::gl {
     std::string replace_all(std::string str, const std::string &from, const std::string &to) {
@@ -153,6 +155,7 @@ namespace iris::gl {
         spdlog::info("OpenGL initialized on \"{}\"", reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
         spdlog::debug("GL_MAX_TEXTURE_IMAGE_UNITS: {} (hardware {})", g_state.gl_state.max_texture_units, units);
 
+#ifdef Iris_Platform_Desktop
         i32 flags;
         glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
 
@@ -169,6 +172,7 @@ namespace iris::gl {
             );
             glDebugMessageCallback(callback::gl_debug, nullptr);
         }
+#endif
     }
 
     void check_error(i32 n) noexcept {
