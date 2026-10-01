@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.28)
 
-if ({CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if (${CMAKE_HOST_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_OSX_ARCHITECTURES arm64)
     set(CMAKE_OSX_SYSROOT macosx)
 endif()
@@ -31,12 +31,29 @@ macro (SetupDesktopBuildDependencies)
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(glfw)
-    find_package(GLEW REQUIRED)
-    if (NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+        FetchContent_Declare(
+            glew
+            GIT_REPOSITORY https://github.com/Perlmint/glew-cmake.git
+            GIT_TAG master
+            GIT_SHALLOW TRUE
+        )
+        set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+        set(glew-cmake_BUILD_STATIC ON CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(glew)
+        set(NATIVE_LINKED_LIBS ${NATIVE_LINKED_LIBS} libglew_static)
+    else()
+        find_package(GLEW REQUIRED)
+        set(NATIVE_LINKED_LIBS ${NATIVE_LINKED_LIBS} GLEW::GLEW)
+    endif()
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+        find_package(OpenGL REQUIRED)
+        set(OPENGL_LIB OpenGL::GL)
+    elseif(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         find_package(OpenGL REQUIRED)
         set(OPENGL_LIB OpenGL::OpenGL)
     endif()
-    set(NATIVE_LINKED_LIBS ${NATIVE_LINKED_LIBS} glfw GLEW::GLEW)
+    set(NATIVE_LINKED_LIBS ${NATIVE_LINKED_LIBS} glfw)
 endmacro()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -54,6 +71,13 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     SetBinaryOutputDirectory(linux)
     SetupDesktopBuildDependencies()
     message(STATUS "IrisNative found for Linux")
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    set(NATIVE_SOURCE windows.cpp)
+    set(NATIVE_LINKED_LIBS ${NATIVE_LINKED_LIBS} User32)
+
+    SetBinaryOutputDirectory(windows)
+    SetupDesktopBuildDependencies()
+    message(STATUS "IrisNative found for Windows")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     if ("${ANDROID_NDK}" STREQUAL "")
         message(FATAL_ERROR "Unrecognized ANDROID_NDK path, set with -DANDROID_NDK")
@@ -201,7 +225,7 @@ foreach(GLSL_FILE ${GLSL_FILES})
         COMMAND ${CMAKE_COMMAND}
             "-DINPUT=${GLSL_FILE}"
             "-DOUTPUT=${OUTPUT}"
-            "-P ${CMAKE_SOURCE_DIR}/cmake/embed_glsl.cmake"
+            -P "${CMAKE_SOURCE_DIR}/cmake/embed_glsl.cmake"
         DEPENDS "${GLSL_FILE}"
         VERBATIM
     )
