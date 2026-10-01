@@ -5,10 +5,25 @@
 #include <string>
 #include <gl.h>
 
+#include <iris/runtime.hpp>
+#include <string>
+#include <format>
+
 namespace iris::gl {
     void gl_init() noexcept {
         glewExperimental = true;
-        glewInit();
+        GLenum err = glewInit();
+
+        if (err == GLEW_ERROR_NO_GLX_DISPLAY) err = GLEW_OK;
+
+        if (err != GLEW_OK) {
+            iris::crash(
+                std::format(
+                    "OpenGL function loading failed — glewInit failed: {}",
+                    reinterpret_cast<const char*>(glewGetErrorString(err))
+                )
+            );
+        }
     }
 }
 
