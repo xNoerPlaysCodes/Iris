@@ -17,49 +17,48 @@
 #include <format>
 
 namespace {
-    size_t utf16_to_utf8(const std::wstring &src, std::string &dst) {
-        size_t di = 0;
-        dst.resize(src.size() * 3);
+    void append_utf16_to_utf8(std::wstring_view src, std::string &dst) {
+        dst.reserve(dst.size() + src.size() * 3);
+        auto put = [&dst](u32 byte) { dst.push_back(static_cast<char>(byte & 0xFF)); };
 
         for (size_t i = 0; i < src.size(); i++) {
-            u16 wc = src[i];
+            u32 wc = src[i];
             if (wc == 0) break;
 
             if (wc >= 0xD800 && wc <= 0xDFFF) {
                 if (wc <= 0xDBFF && i + 1 < src.size()) {
-                    u16 wc2 = src[i + 1];
+                    u32 wc2 = src[i + 1];
                     if (wc2 >= 0xDC00 && wc2 <= 0xDFFF) {
                         u32 codepoint = 0x10000 + (((wc - 0xD800) << 10) | (wc2 - 0xDC00));
                         i++;
 
-                        dst[di++] = 0xF0 | (codepoint >> 18);
-                        dst[di++] = 0x80 | ((codepoint >> 12) & 0x3F);
-                        dst[di++] = 0x80 | ((codepoint >> 6) & 0x3F);
-                        dst[di++] = 0x80 | (codepoint & 0x3F);
+                        put(0xF0 | ((codepoint >> 18) & 0x3F));
+                        put(0x80 | ((codepoint >> 12) & 0x3F));
+                        put(0x80 | ((codepoint >> 6) & 0x3F));
+                        put(0x80 | (codepoint & 0x3F));
                         continue;
                     }
                 }
                 // invalid surrogate: replace with '?'
-                dst[di++] = '?';
+                put('?');
                 continue;
             }
 
             // normal code unit
-            uint32_t codepoint = wc;
+            u32 codepoint = wc;
             if (codepoint < 0x80) {
-                dst[di++] = static_cast<char>(codepoint);  // ASCII MY BELOVED
+                put(codepoint);  // ASCII MY BELOVED
             } else if (codepoint < 0x800) {
-                dst[di++] = 0xC0 | (codepoint >> 6);
-                dst[di++] = 0x80 | (codepoint & 0x3F);
+                put(0xC0 | (codepoint >> 6));
+                put(0x80 | (codepoint & 0x3F));
             } else {
-                dst[di++] = 0xE0 | (codepoint >> 12);
-                dst[di++] = 0x80 | ((codepoint >> 6) & 0x3F);
-                dst[di++] = 0x80 | (codepoint & 0x3F);
+                put(0xE0 | (codepoint >> 12));
+                put(0x80 | ((codepoint >> 6) & 0x3F));
+                put(0x80 | (codepoint & 0x3F));
             }
         }
 
-        dst.resize(di); // Took me a while to realize, size is last_idx+1
-        return di;
+        return;
     }
 }
 
@@ -81,6 +80,7 @@ namespace iris::native {
     void init() noexcept {
         SetConsoleOutputCP(CP_UTF8); // Windows is weird
     }
+
     void terminate() noexcept {
         std::terminate();
     }
@@ -105,27 +105,28 @@ namespace iris::native {
         
         if (!GetComputerNameW(name, &size)) return "";
 
-        std::wstring computerNameWide{name, size};
         std::string computerName{};
-        utf16_to_utf8(computerNameWide, computerName);
+        append_utf16_to_utf8(name, computerName);
         return computerName;
     }
 
     std::string processor_name() noexcept {
         int cpu_info[4] = {};
-        alignas(int) char brand[0x40] = {};
-
         __cpuid(cpu_info, 0x80000000);
-        unsigned int max_ext_id = static_cast<unsigned int>(cpu_info[0]);
-        if (max_ext_id < 0x80000004) {
-            return "";
-        }
+        u32 max_ext_id = static_cast<u32>(cpu_info[0]);
+        if (max_ext_id < 0x80000004) return "";
 
-        __cpuid(reinterpret_cast<int*>(brand), 0x80000002);
-        __cpuid(reinterpret_cast<int*>(brand + 16), 0x80000003);
-        __cpuid(reinterpret_cast<int*>(brand + 32), 0x80000004);
+        int regs[12] = {};
+        __cpuid(regs + 0, 0x80000002);
+        __cpuid(regs + 4, 0x80000003);
+        __cpuid(regs + 8, 0x80000004);
 
-        return std::string(brand);
+        char brand[sizeof(regs) + 1] = {};
+        std::memcpy(brand, regs, sizeof(regs));
+
+        std::string name(brand);
+        name.erase(0, name.find_first_not_of(' ')); // Intel pads the start with spaces
+        return name;
     }
 
     glm::ivec2 screen_resolution() noexcept {
