@@ -79,7 +79,7 @@ namespace iris {
             return;
         }
 
-        std::ifstream file(path);
+        std::ifstream file(path, std::ios::binary);
 
         if (!file.is_open()) {
             iris::error(error_code::filesystem_error);
