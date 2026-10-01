@@ -6,3 +6,7 @@ src/include/resources/*
 native_test_dir/*
 configure_cmake_*
 .DS_Store
+
+compile_commands.json
+log.txt
+*.log

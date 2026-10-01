@@ -3,14 +3,27 @@
 #include <exception>
 #include <native.hpp>
 #include <IOKit/hid/IOHIDManager.h>
+#include <format>
+#include <string>
 #include <CoreGraphics/CoreGraphics.h>
+#include <iris/runtime.hpp>
 #include <sys/sysctl.h>
 #include <vector>
+
+#include <algorithm>
+#include <cstdio>
 
 namespace iris::gl {
     void gl_init() noexcept {
         glewExperimental = true;
-        glewInit();
+        if (GLenum err = glewInit(); err != GLEW_OK) {
+            iris::crash(
+                std::format(
+                    "OpenGL function loading failed — glewInit failed: {}",
+                    reinterpret_cast<const char*>(glewGetErrorString(err))
+                )
+            );
+        }
     }
 }
 

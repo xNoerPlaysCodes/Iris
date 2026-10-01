@@ -5,10 +5,25 @@
 #include <string>
 #include <gl.h>
 
+#include <iris/runtime.hpp>
+#include <string>
+#include <format>
+
 namespace iris::gl {
     void gl_init() noexcept {
         glewExperimental = true;
-        glewInit();
+        GLenum err = glewInit();
+
+        if (err == GLEW_ERROR_NO_GLX_DISPLAY) err = GLEW_OK;
+
+        if (err != GLEW_OK) {
+            iris::crash(
+                std::format(
+                    "OpenGL function loading failed — glewInit failed: {}",
+                    reinterpret_cast<const char*>(glewGetErrorString(err))
+                )
+            );
+        }
     }
 }
 
@@ -32,14 +47,8 @@ namespace iris::native {
 
     std::string device_name() noexcept {
         std::ifstream file("/sys/devices/virtual/dmi/id/product_name");
-        file.seekg(0, std::ios::end);
-        size_t sz = file.tellg();
-        file.seekg(0, std::ios::beg);
         std::string name;
-        name.resize(sz + 1);
-        file.read(name.data(), sz);
-        name[sz] = '\0';
-        name.erase(std::remove(name.begin(), name.end(), '\n'), name.end());
+        if (!std::getline(file, name)) return {};
         return name;
     }
 

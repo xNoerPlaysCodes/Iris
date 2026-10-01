@@ -179,9 +179,10 @@ namespace iris {
 
             internal::g_state.gl_state.default_fb = create_framebuffer(this->viewport_size_);
 
-            glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
         }
 
+        glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
+        glEnable(GL_DEPTH_TEST);
         glViewport(vp_offset.x, vp_offset.y, vp_size.x, vp_size.y);
 
         this->flush_drawcalls(); // actually draw
@@ -224,6 +225,9 @@ namespace iris {
         std::vector<gl::instance> quad_instances;
         quad_instances.reserve(this->drawcalls.size());
 
+        // BTW: texture instancing rather than solid color instancing
+        // should use diff shader sooo thus a different seperate drawcall
+        // and IBO
         auto is_instanceable = [](const drawcall &dc) -> bool {
             return dc.object.type == gl::object::type::quad
                 && dc.texture == 0; // TODO: Add texture instancing asw!!!
@@ -306,9 +310,6 @@ namespace iris {
 
     void renderer::clear(rgba_color color) noexcept {
         pre_draw_check();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, internal::g_state.gl_state.default_fb.fbo);
         glClearColor(color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
