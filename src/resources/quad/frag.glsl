@@ -13,6 +13,6 @@ void main() {
     if (p_texture_provided == 1) {
         FragColor = texture(p_texture, v_uv);
     } else {
-        FragColor = vec4(0., 0., v_z, 1.);
+        FragColor = v_color;
     }
 }
