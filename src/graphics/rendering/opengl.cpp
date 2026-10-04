@@ -24,6 +24,7 @@
 
 #include "resources/fb_blit_vert.glsl.h"
 #include "resources/fb_blit_frag.glsl.h"
+#include "utilities.hpp"
 
 namespace iris {
     namespace {
@@ -213,7 +214,7 @@ namespace iris {
         this->begin_frame_called = !this->begin_frame_called;
         IrisAssert(this->begin_frame_called == false);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        util::wait_for(1. / static_cast<double>(this->config.fps));
     }
 
     void renderer::pre_draw_check() const noexcept {

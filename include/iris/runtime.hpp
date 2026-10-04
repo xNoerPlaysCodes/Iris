@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nutils/types.hpp"
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
 #include <string_view>
@@ -113,7 +114,9 @@ namespace iris {
     }
 }
 
-struct iris_main_arguments {};
+struct iris_main_arguments {
+    std::filesystem::path root;
+};
 
 void iris_main(const iris_main_arguments &args);
 
@@ -122,27 +125,16 @@ void iris_main(const iris_main_arguments &args);
     int main(int argc, char **argv) { \
         iris::detail::pre_main(); \
         iris::detail::init_set_arguments(argc, argv); \
-        iris_main({}); \
+        iris_main({ \
+            .root = "/", \
+        }); \
     }
 #else
 #define IrisPlatformGlue \
     android_app *g_android_app; \
+    namespace iris::detail { void android_setup(android_app *app) noexcept; } \
     extern "C" void android_main(android_app *app) { \
-        g_android_app = app; \
-        app->onAppCmd = [](android_app *app, int32_t cmd) {}; \
-            ANativeActivity_setWindowFlags(app->activity, \
-            0, 0); \
-        while (app->window == nullptr) { \
-            int events; \
-            android_poll_source *src; \
-            ALooper_pollOnce(100, nullptr, &events, (void**)&src); \
-            if (src != nullptr) src->process(app, src); \
-            if (app->destroyRequested) return; \
-        } \
-        iris::detail::pre_main(); \
-        char *args[] = { (char*) "program", nullptr }; \
-        iris::detail::init_set_arguments(0, args); \
-        iris_main({}); \
+        iris::detail::android_setup(app); \
     }
 #endif
 

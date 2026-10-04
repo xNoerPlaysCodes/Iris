@@ -4,6 +4,7 @@
 #include "spdlog/spdlog.h"
 #include "utilities.hpp"
 #include <cstddef>
+#include <fstream>
 #include <iostream>
 #include <iris/runtime.hpp>
 #include <string>
@@ -14,6 +15,48 @@
 #define Iris_Args \
      X(fast-startup, "Enables fast-startup by disabling some startup checks\n", flags.fast_startup) \
      X(no-input-capability-check, "Disables startup input capabilities check (returns false on everything)\n", flags.no_input_capability_check)
+
+extern android_app *g_android_app;
+
+namespace iris::detail {
+    void android_setup(android_app *app) noexcept {
+        g_android_app = app;
+        app->onAppCmd = [](android_app *, int32_t) {};
+            ANativeActivity_setWindowFlags(app->activity,
+            0, 0);
+        while (app->window == nullptr) {
+            int events;
+            android_poll_source *src;
+            ALooper_pollOnce(100, nullptr, &events, (void**)&src);
+            if (src != nullptr) src->process(app, src);
+            if (app->destroyRequested) return;
+        }
+
+        AAssetManager* mgr = app->activity->assetManager; 
+        std::string internal = std::string(app->activity->internalDataPath) + "/"; 
+        std::filesystem::create_directories(internal + "resources"); 
+        AAssetDir* dir = AAssetManager_openDir(mgr, "resources"); 
+        const char* filename; 
+        while ((filename = AAssetDir_getNextFileName(dir)) != nullptr) { 
+            std::string src_path = std::string("resources/") + filename; 
+            std::string dst_path = internal + "resources/" + filename; 
+            AAsset* asset = AAssetManager_open(mgr, src_path.c_str(), AASSET_MODE_BUFFER); 
+            if (!asset) continue; 
+            size_t size = AAsset_getLength(asset); 
+            std::vector<uint8_t> buf(size); 
+            AAsset_read(asset, buf.data(), size); 
+            AAsset_close(asset); 
+            std::ofstream f(dst_path, std::ios::binary); 
+            f.write((char*)buf.data(), size); 
+        }
+        iris::detail::pre_main();
+        char *args[] = { (char*) "program", nullptr };
+        iris::detail::init_set_arguments(0, args);
+        iris_main({
+            .root = std::filesystem::path(std::format("{}/", g_android_app->activity->internalDataPath)),
+        });
+    }
+}
 
 namespace {
     struct cli_flags {

@@ -1,3 +1,5 @@
+#include "spdlog/spdlog.h"
+#include <thread>
 #include <utilities.hpp>
 
 namespace iris::util {
@@ -90,4 +92,37 @@ namespace iris::util {
         if (!result.empty()) result.erase(result.size() - 2); // remove trailing ", "
         return result.empty() ? "0us" : result;
     }
+
+    // -- AI --
+    void wait_for(double target_seconds) noexcept {
+        using clock = std::chrono::steady_clock;
+        using duration = clock::duration;
+        namespace chr = std::chrono;
+
+        static double spin_wait = 0.002;
+        static double last_overshoot = 0.;
+
+        const auto target = chr::duration<double>(target_seconds);
+        const auto start = clock::now();
+        const auto deadline = start + chr::duration_cast<duration>(target);
+
+        if (target_seconds <= 0.0)
+            return;
+
+        spin_wait = std::clamp(spin_wait + last_overshoot * 0.25, 0., 0.005);
+
+        const auto spin_duration = chr::duration_cast<duration>(chr::duration<double>(spin_wait));
+
+        if (clock::now() + spin_duration < deadline) {
+            std::this_thread::sleep_until(deadline - spin_duration);
+        }
+
+        while (clock::now() < deadline) {}
+
+        const auto end = clock::now();
+        const double elapsed = chr::duration<double>(end - start).count();
+
+        last_overshoot = std::clamp(elapsed - target_seconds, 0., 0.01);
+    }
+    // -- -- --
 }
